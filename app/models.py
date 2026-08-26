@@ -20,5 +20,8 @@ class User(Base):
     first_name = Column(String, nullable=False)
     last_name = Column(String, nullable=False)
     # created_at：记录创建时间，server_default=func.now()表示不手动传值时，
-    # 数据库会自动填入当前时间
+    # 数据库会自动填入当前时间。这个值一旦写入就不会再变
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+    # updated_at：记录最近一次被修改的时间。onupdate=func.now()表示每次这条记录
+    # 被更新（比如改姓名），SQLAlchemy会自动把这个字段刷新成当前时间
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
