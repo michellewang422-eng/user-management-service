@@ -42,5 +42,11 @@ def create_user(user: UserCreate, db: Session = Depends(get_db)):
     # 这一步把数据库最新的完整数据，重新读回new_user这个对象里
     db.refresh(new_user)
 
-    # 返回这个对象，FastAPI会用response_model=UserOut的机制自动转换成JSON
+    # 这里返回的new_user是SQLAlchemy的User对象，不是UserOut——
+    # User -> UserOut 的转换不是写在这里的显式代码，而是FastAPI在背后自动完成的：
+    # 1. 上面@router.post(..., response_model=UserOut) 告诉FastAPI最终要按UserOut格式返回
+    # 2. UserOut里的 class Config: from_attributes = True 允许Pydantic
+    #    直接从User对象的属性（.id、.email等）读取数据
+    # FastAPI拦截这个返回值，自动调用类似UserOut.model_validate(new_user)的操作完成转换，
+    # 再序列化成JSON发给前端，这一步对开发者是"隐形"的，不需要手写
     return new_user
