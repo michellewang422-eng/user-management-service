@@ -18,3 +18,18 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 # "这个类对应数据库里的哪张表、有哪些字段"，方便之后统一建表
 Base = declarative_base()
 
+# get_db：FastAPI会调用这个函数，来"要一个数据库连接"，交给路由函数使用
+def get_db():
+    # 调用SessionLocal（会话工厂），创建一个全新的数据库会话
+    # 可以理解成"打开一扇跟数据库对话的窗口"，每次请求都开一扇全新的，互不干扰
+    db = SessionLocal()
+    try:
+        # yield 和 return 不一样：return会结束整个函数；yield会暂停在这里，
+        # 把db交给调用它的路由函数使用，函数本身没有结束，之后还能继续往下执行。
+        # 路由函数执行完（不管成功还是报错），代码会跳回这里，继续执行yield之后的部分
+        yield db
+    finally:
+        # try...finally：finally里的代码，不管前面发生了什么（成功还是报错），
+        # 都保证会被执行到。这里保证不管请求处理结果如何，最后都会把这扇
+        # "数据库对话窗口"关掉，避免忘记关闭连接导致资源一直被占用
+        db.close()
