@@ -4,6 +4,8 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import User
 from app.schemas import UserCreate, UserOut
+# List：Python的类型注解工具，List[UserOut]表示"一个数组，里面每一项都是UserOut格式"
+from typing import List
 
 # APIRouter：FastAPI提供的"迷你app"，先在这里单独定义一堆路由，
 # 之后再统一"接入"main.py里的主应用
@@ -50,3 +52,46 @@ def create_user(user: UserCreate, db: Session = Depends(get_db)):
     # FastAPI拦截这个返回值，自动调用类似UserOut.model_validate(new_user)的操作完成转换，
     # 再序列化成JSON发给前端，这一步对开发者是"隐形"的，不需要手写
     return new_user
+
+
+# {user_id} 这种花括号写法，声明"这部分URL是一个变量"（路径参数），
+# 跟PR-05的"请求体"（body）是不同的传参方式
+@router.get("/users/{user_id}", response_model=UserOut)
+def get_user(user_id: int, db: Session = Depends(get_db)):
+    # 函数参数名user_id要跟URL里的{user_id}完全一致，FastAPI才知道要把URL里的
+    # 这部分内容传给这个参数。类型注解: int 会让FastAPI自动把URL字符串转成整数，
+    # 如果传的不是数字（比如/users/abc），会自动返回错误，不用自己写转换代码
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        # 查不到就返回404，而不是让代码往下跑到return user时
+        # 因为user是None而出问题
+        raise HTTPException(status_code=404, detail="用户不存在")
+    return user
+
+
+# response_model=List[UserOut]：告诉FastAPI，这次返回值是一个数组，
+# 会对数组里每一个用户对象分别做 User -> UserOut 的转换
+@router.get("/users", response_model=List[UserOut])
+def get_users(db: Session = Depends(get_db)):
+    # .all() 跟前面用的 .first() 不同，是把符合条件的所有结果都拿出来；
+    # 这里没加 .filter()，所以查的是全部用户
+    #
+    # 注意：这种"返回全部数据"的写法，用户量小时没问题，但真实项目里
+    # 数据量大了会很慢——这里先不做分页（pagination），留作认知铺垫
+    users = db.query(User).all()
+    return users
+
+
+# 注意路由写法：/users/by-email/{email} —— FastAPI靠URL的具体写法
+# （/users/1 vs /users/by-email/xxx@xxx.com）来区分该走哪个路由，不会跟上面的{user_id}搞混
+#
+# 为什么要单独做这个接口，而不是让前端调用GET /users拿全部数据自己筛选：
+# 如果系统里有10万个用户，"下载全部再筛选"要传输10万条数据，非常浪费又慢；
+# "在数据库层筛选"不管数据库里有多少条数据，传输的永远只是符合条件的那一条——
+# 把"找数据"这件耗资源的事交给专门为此优化过的数据库，而不是丢给前端硬算
+@router.get("/users/by-email/{email}", response_model=UserOut)
+def get_user_by_email(email: str, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.email == email).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="用户不存在")
+    return user
