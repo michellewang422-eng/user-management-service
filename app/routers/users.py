@@ -88,15 +88,8 @@ def get_users(email: str | None = None, db: Session = Depends(get_db)):
     if email:
         query = query.filter(User.email == email)
 
-    # .all() 把符合条件的所有结果都拿出来
-    users = query.all()
-
-    # 专门针对"按email查、但一个都没查到"这种情况，返回404+清晰提示，
-    # 而不是让调用方自己去判断"数组是不是空的"——这样更明确，
-    # 不会让人误以为"是不是系统出问题了"。
-    # 注意：这里只在"传了email"时才检查，因为没传email时（查全部列表），
-    # 结果为空是完全正常的（比如系统里还没有任何用户），不该算错误
-    if email and not users:
-        raise HTTPException(status_code=404, detail="邮箱未注册")
-
-    return users
+    # .all() 把符合条件的所有结果都拿出来。查不到时（不管传没传email）
+    # 都返回200 + 空数组[]，而不是404——这是"筛选列表"接口的标准语义：
+    # 不管筛选条件匹配到0条还是多条，这次查询本身都算成功，
+    # "没有符合条件的结果"也是一种合法的查询结果
+    return query.all()
