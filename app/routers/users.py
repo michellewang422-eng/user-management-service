@@ -71,27 +71,32 @@ def get_user(user_id: int, db: Session = Depends(get_db)):
 
 # response_model=List[UserOut]：告诉FastAPI，这次返回值是一个数组，
 # 会对数组里每一个用户对象分别做 User -> UserOut 的转换
-@router.get("/users", response_model=List[UserOut])
-def get_users(db: Session = Depends(get_db)):
-    # .all() 跟前面用的 .first() 不同，是把符合条件的所有结果都拿出来；
-    # 这里没加 .filter()，所以查的是全部用户
-    #
-    # 注意：这种"返回全部数据"的写法，用户量小时没问题，但真实项目里
-    # 数据量大了会很慢——这里先不做分页（pagination），留作认知铺垫
-    users = db.query(User).all()
-    return users
-
-
-# 注意路由写法：/users/by-email/{email} —— FastAPI靠URL的具体写法
-# （/users/1 vs /users/by-email/xxx@xxx.com）来区分该走哪个路由，不会跟上面的{user_id}搞混
 #
-# 为什么要单独做这个接口，而不是让前端调用GET /users拿全部数据自己筛选：
-# 如果系统里有10万个用户，"下载全部再筛选"要传输10万条数据，非常浪费又慢；
-# "在数据库层筛选"不管数据库里有多少条数据，传输的永远只是符合条件的那一条——
-# 把"找数据"这件耗资源的事交给专门为此优化过的数据库，而不是丢给前端硬算
-@router.get("/users/by-email/{email}", response_model=UserOut)
-def get_user_by_email(email: str, db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.email == email).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="用户不存在")
-    return user
+# email: str | None = None —— 可选的query参数，用法是 /users?email=xxx@xxx.com
+# 不传就是None，代表不筛选。以后想加更多筛选条件（比如按更新时间），
+# 只需要照这个样子再加一个参数，不用为每种筛选单独开一个新接口
+#
+# 注意：这种"没有筛选条件时返回全部数据"的写法，用户量小时没问题，但真实
+# 项目里数据量大了会很慢——这里先不做分页（pagination），留作认知铺垫
+@router.get("/users", response_model=List[UserOut])
+def get_users(email: str | None = None, db: Session = Depends(get_db)):
+    # 先从"查全部用户"这个基础查询开始
+    query = db.query(User)
+
+    # 如果传了email，就在基础查询上再加一层筛选条件
+    # （因为email是unique的，筛选后最多只会匹配到1条，但返回格式依然是数组）
+    if email:
+        query = query.filter(User.email == email)
+
+    # .all() 把符合条件的所有结果都拿出来
+    users = query.all()
+
+    # 专门针对"按email查、但一个都没查到"这种情况，返回404+清晰提示，
+    # 而不是让调用方自己去判断"数组是不是空的"——这样更明确，
+    # 不会让人误以为"是不是系统出问题了"。
+    # 注意：这里只在"传了email"时才检查，因为没传email时（查全部列表），
+    # 结果为空是完全正常的（比如系统里还没有任何用户），不该算错误
+    if email and not users:
+        raise HTTPException(status_code=404, detail="邮箱未注册")
+
+    return users
