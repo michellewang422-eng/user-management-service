@@ -4,6 +4,8 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import User
 from app.schemas import UserCreate, UserOut
+# List：Python的类型注解工具，List[UserOut]表示"一个数组，里面每一项都是UserOut格式"
+from typing import List
 
 # APIRouter：FastAPI提供的"迷你app"，先在这里单独定义一堆路由，
 # 之后再统一"接入"main.py里的主应用
@@ -50,3 +52,44 @@ def create_user(user: UserCreate, db: Session = Depends(get_db)):
     # FastAPI拦截这个返回值，自动调用类似UserOut.model_validate(new_user)的操作完成转换，
     # 再序列化成JSON发给前端，这一步对开发者是"隐形"的，不需要手写
     return new_user
+
+
+# {user_id} 这种花括号写法，声明"这部分URL是一个变量"（路径参数），
+# 跟PR-05的"请求体"（body）是不同的传参方式
+@router.get("/users/{user_id}", response_model=UserOut)
+def get_user(user_id: int, db: Session = Depends(get_db)):
+    # 函数参数名user_id要跟URL里的{user_id}完全一致，FastAPI才知道要把URL里的
+    # 这部分内容传给这个参数。类型注解: int 会让FastAPI自动把URL字符串转成整数，
+    # 如果传的不是数字（比如/users/abc），会自动返回错误，不用自己写转换代码
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        # 查不到就返回404，而不是让代码往下跑到return user时
+        # 因为user是None而出问题
+        raise HTTPException(status_code=404, detail="用户不存在")
+    return user
+
+
+# response_model=List[UserOut]：告诉FastAPI，这次返回值是一个数组，
+# 会对数组里每一个用户对象分别做 User -> UserOut 的转换
+#
+# email: str | None = None —— 可选的query参数，用法是 /users?email=xxx@xxx.com
+# 不传就是None，代表不筛选。以后想加更多筛选条件（比如按更新时间），
+# 只需要照这个样子再加一个参数，不用为每种筛选单独开一个新接口
+#
+# 注意：这种"没有筛选条件时返回全部数据"的写法，用户量小时没问题，但真实
+# 项目里数据量大了会很慢——这里先不做分页（pagination），留作认知铺垫
+@router.get("/users", response_model=List[UserOut])
+def get_users(email: str | None = None, db: Session = Depends(get_db)):
+    # 先从"查全部用户"这个基础查询开始
+    query = db.query(User)
+
+    # 如果传了email，就在基础查询上再加一层筛选条件
+    # （因为email是unique的，筛选后最多只会匹配到1条，但返回格式依然是数组）
+    if email:
+        query = query.filter(User.email == email)
+
+    # .all() 把符合条件的所有结果都拿出来。查不到时（不管传没传email）
+    # 都返回200 + 空数组[]，而不是404——这是"筛选列表"接口的标准语义：
+    # 不管筛选条件匹配到0条还是多条，这次查询本身都算成功，
+    # "没有符合条件的结果"也是一种合法的查询结果
+    return query.all()
