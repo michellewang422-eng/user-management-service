@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -93,3 +93,57 @@ def get_users(email: str | None = None, db: Session = Depends(get_db)):
     # 不管筛选条件匹配到0条还是多条，这次查询本身都算成功，
     # "没有符合条件的结果"也是一种合法的查询结果
     return query.all()
+
+
+# PUT 和 PATCH 的区别：PUT 是"整条替换"，要求前端把 email/first_name/last_name
+# 三个字段全部传齐（哪怕只想改一个，另外两个也得原样带上）；PATCH 是"部分更新"，
+# 只传想改的字段。这里先用语义更简单的 PUT，直接复用现成的 UserCreate
+# （三个字段都必填）当请求体，不用另外定义新 schema。PATCH 留作以后的 PR
+@router.put("/users/{user_id}", response_model=UserOut)
+def update_user(user_id: int, payload: UserCreate, db: Session = Depends(get_db)):
+    # 第一步：按 id 找到这条记录，找不到就 404——和 GET /users/{user_id} 完全一样的套路
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="用户不存在")
+
+    # 第二步：邮箱查重。和 POST /users 的查重类似，但这里多了一个 User.id != user_id 的条件——
+    # 因为如果前端传的 email 就是这条记录自己当前的 email（没改邮箱、只改姓名），
+    # 不排除自己的话会误判成"邮箱已被占用"。所以只拦"别人"占用的情况
+    email_taken = (
+        db.query(User)
+        .filter(User.email == payload.email, User.id != user_id)
+        .first()
+    )
+    if email_taken:
+        raise HTTPException(status_code=400, detail="邮箱已被其他用户占用")
+
+    # 第三步：把校验过的新值逐个写回这个 SQLAlchemy 对象的属性
+    # （user 是上面从数据库查出来的对象，SQLAlchemy 会自动记住"哪些字段被改过"）
+    user.email = payload.email
+    user.first_name = payload.first_name
+    user.last_name = payload.last_name
+
+    # commit 时 SQLAlchemy 才真正把 UPDATE 语句发给数据库。
+    # models.py 里 updated_at 配了 onupdate=func.now()，这一步会自动把它刷成当前时间，
+    # 不需要在这里手动赋值
+    db.commit()
+    # 把数据库里这条记录的最新状态（含刚刷新的 updated_at）重新读回 user 对象
+    db.refresh(user)
+
+    return user
+
+
+# status_code=204：HTTP 里"成功、且响应体为空"的标准状态码，删除成功时常用——
+# 资源已经没了，没有内容可返回。配 204 时不写 response_model，函数也不 return 任何东西
+@router.delete("/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_user(user_id: int, db: Session = Depends(get_db)):
+    # 同样先按 id 查。删一个本来就不存在的用户，返回 404 而不是"假装删成功"——
+    # 让调用方明确知道"你要删的东西找不到"
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="用户不存在")
+
+    # db.delete 把这条记录标记为"待删除"，同样要 commit 才真正在数据库里删掉
+    db.delete(user)
+    db.commit()
+    # 不 return——FastAPI 看到 204 会直接发一个空响应
