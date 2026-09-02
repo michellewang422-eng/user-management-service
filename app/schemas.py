@@ -28,3 +28,11 @@ class UserOut(BaseModel):
         # （比如 .id、.email）里读取数据，而不是只认字典格式
         # 没有这行，PR-05返回数据库查询结果时会报错
         from_attributes = True
+
+
+# LoginRequest：定义"登录"时前端传进来的数据。
+# 这个简化版登录只有 email 一个字段、没有密码——正因为如此它并不安全：
+# 任何人只要知道你的 email 就能"登录"进你的账号。以后加密码/验证码/JWT
+# 就是为了堵这个漏洞。
+class LoginRequest(BaseModel):
+    email: EmailStr

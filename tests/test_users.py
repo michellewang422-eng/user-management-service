@@ -1,54 +1,17 @@
 """
 用 Python 内置的 unittest 框架，测 POST / GET / PUT / DELETE 四类用户接口。
 
-核心思路（3 个知识点）：
-1. 不碰真实的 users.db —— 每个测试都用一个「内存里的 SQLite」，跑完即焚，
-   互不影响，也不会污染开发用的数据库。
-2. 依赖覆盖（dependency override）—— app 里路由函数是靠 Depends(get_db) 拿数据库
-   会话的。测试时用 app.dependency_overrides 把 get_db 换成「连测试库」的版本，
-   路由代码一行都不用改。
-3. TestClient —— FastAPI 提供的「假客户端」，能像发真 HTTP 请求一样调用 app，
-   但不用真的起服务器、不用真的联网，速度快、好断言。
+测试环境（内存 SQLite + 依赖覆盖 + TestClient）统一放在 tests/_support.py 里，
+这里直接继承 DBTestCase（它已经写好了 setUp/tearDown：每个用例前建空表、后删表）。
+
+为什么要抽到共用模块、而不是每个测试文件各写一遍：
+app.dependency_overrides 是个全局字典，key 是 get_db。如果 test_users.py 和
+test_auth.py 各建一个 engine、各覆盖一次，后 import 的会盖掉先 import 的——
+跑 `python -m unittest discover` 时，一部分测试的请求会打到「没建过表」的那个
+engine 上，报 `no such table: users`。共用一个 engine 就没这个问题。
 """
 
-import unittest
-
-from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import StaticPool
-
-from app.database import Base, get_db
-from app.main import app
-# 必须导入 User，Base 才知道有 users 这张表，下面 create_all 才建得出来
-from app.models import User  # noqa: F401
-
-
-# ---------------------------------------------------------------------------
-# 测试用数据库：内存 SQLite
-# ---------------------------------------------------------------------------
-# "sqlite://"（后面没有文件路径）表示「建在内存里」，进程结束就没了。
-# StaticPool + check_same_thread=False：让 TestClient 的多个线程共用同一个
-# 内存连接，否则每个线程各开一个内存库，数据对不上。
-engine = create_engine(
-    "sqlite://",
-    connect_args={"check_same_thread": False},
-    poolclass=StaticPool,
-)
-TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
-
-def override_get_db():
-    """和 app/database.py 里的 get_db 一模一样，只是绑到测试用的 engine。"""
-    db = TestingSessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-
-
-# 关键一步：告诉 app「凡是要用 get_db 的地方，改用 override_get_db」
-app.dependency_overrides[get_db] = override_get_db
+from tests._support import DBTestCase
 
 
 # 一份合法的创建用户数据，测试里反复用
@@ -59,16 +22,7 @@ VALID_PAYLOAD = {
 }
 
 
-class UserAPITestCase(unittest.TestCase):
-    def setUp(self):
-        """每个 test_ 方法跑之前都会执行：建一套干净的空表 + 一个新 client。"""
-        Base.metadata.create_all(bind=engine)
-        self.client = TestClient(app)
-
-    def tearDown(self):
-        """每个 test_ 方法跑完执行：把所有表删掉，下一个测试从零开始。"""
-        Base.metadata.drop_all(bind=engine)
-
+class UserAPITestCase(DBTestCase):
     # 小工具：先塞一个用户进去，返回它的 JSON（很多测试都要先有一条数据）
     def _create_user(self, **overrides):
         payload = {**VALID_PAYLOAD, **overrides}
@@ -302,4 +256,6 @@ class UserAPITestCase(unittest.TestCase):
 
 
 if __name__ == "__main__":
+    import unittest
+
     unittest.main()
