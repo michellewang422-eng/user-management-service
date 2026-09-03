@@ -102,7 +102,14 @@
     <!-- 编辑 / 删除 出错时在这里显示一句话 -->
     <p class="op-msg" id="op-msg" hidden></p>
 
-    <div class="note">
+    <!-- 这一屏对应哪些后端接口（学习备注，默认隐藏；想看把 hidden 去掉）：
+         · 加载时读 localStorage.currentUser，没有就跳回 login.html
+         · "我的资料"卡 ← GET /users/{id}；"所有用户"列表 ← GET /users
+         · 勾选 1 个 → "用户详情"（GET /users/{id}）→ 编辑资料 → PUT /users/{id}
+         · 勾选 1 个或多个 → 删除账号 → 对每个选中的 DELETE /users/{id}（204）
+         · 登出 → localStorage.removeItem("currentUser") → 跳登录页
+    -->
+    <div class="note" hidden>
       <p>加载时读 <code>localStorage.currentUser</code>，没有就跳回 <code>login.html</code></p>
       <p>"我的资料"卡 &larr; <code>GET /users/{id}</code>；"所有用户"列表 &larr; <code>GET /users</code></p>
       <p>勾选 1 个 &rarr; "用户详情"（<code>GET /users/{id}</code>）&rarr; 编辑资料 &rarr; <code>PUT /users/{id}</code></p>
