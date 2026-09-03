@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>登录 · User Service</title>
+
+  <!-- Google Fonts：浏览器会自己去下载，本地双击打开也能用 -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+
+  <!-- 三个页面共用的样式 -->
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="wrap">
+    <header class="page-head">
+      <p class="kicker">user-service-web</p>
+      <h1>登录</h1>
+    </header>
+
+    <div class="card">
+      <h2>登录 User Service</h2>
+      <p class="sub">输入注册时用的邮箱即可进入（这一版没有密码）。</p>
+
+      <!-- PR-13 会加 JS：登录返回 401 时，去掉这个 hidden 让它显示出来 -->
+      <div class="alert" hidden>
+        <span>&#9888;</span>
+        <div><b>邮箱未注册。</b>请检查拼写，或先去注册一个账号。</div>
+      </div>
+
+      <div class="field">
+        <label for="email">邮箱</label>
+        <!-- PR-12 先写死一个默认值，方便看样子 -->
+        <input id="email" type="email" value="alice@example.com" autocomplete="email">
+      </div>
+
+      <!-- PR-12：先用 <a> 让"登录"能跳到主页，把页面串起来
+           PR-13：换成真正的 <button>，点击时 fetch POST /auth/login -->
+      <a class="btn block" href="index.html">登录</a>
+
+      <p class="switch">没有账号？<a href="register.html">去注册</a></p>
+    </div>
+  </main>
+</body>
+</html>

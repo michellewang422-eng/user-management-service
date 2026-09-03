@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>注册 · User Service</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="wrap">
+    <header class="page-head">
+      <p class="kicker">user-service-web</p>
+      <h1>注册</h1>
+    </header>
+
+    <div class="card">
+      <h2>注册新账号</h2>
+      <p class="sub">填三个字段，注册成功后回登录页。</p>
+
+      <!-- PR-13/14 会加 JS：注册失败（邮箱已存在等）时显示 -->
+      <div class="alert" hidden>
+        <span>&#9888;</span>
+        <div><b>这个邮箱已经注册过了。</b>换一个，或直接去登录。</div>
+      </div>
+
+      <div class="field">
+        <label for="email">邮箱</label>
+        <input id="email" type="email" placeholder="you@example.com" autocomplete="email">
+      </div>
+      <div class="field">
+        <label for="first-name">名 first_name</label>
+        <input id="first-name" type="text" placeholder="Xianwen">
+      </div>
+      <div class="field">
+        <label for="last-name">姓 last_name</label>
+        <input id="last-name" type="text" placeholder="Wang">
+      </div>
+
+      <!-- PR-12：先用 <a> 跳回登录页；PR-14：换成 <button>，fetch POST /users -->
+      <a class="btn block" href="login.html">注册</a>
+
+      <p class="switch">已有账号？<a href="login.html">去登录</a></p>
+    </div>
+  </main>
+</body>
+</html>
