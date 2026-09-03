@@ -1,0 +1,444 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>主页 · User Service</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="wrap">
+    <header class="page-head">
+      <p class="kicker">user-service-web</p>
+      <h1>主页</h1>
+    </header>
+
+    <!-- ============ 顶部问候 + 登出 ============ -->
+    <div class="greet">
+      <h2>你好，<span class="who">…</span></h2>
+      <span class="tag">已登录</span>
+      <button class="btn ghost logout" type="button" id="logout-btn">登出</button>
+    </div>
+
+    <!-- ============ 我的资料（当前登录用户，GET /users/{id}）============ -->
+    <div class="panel">
+      <h3>我的资料</h3>
+      <div class="panel-body">
+        <div class="row"><span class="k">ID</span><span class="v" id="me-id">…</span></div>
+        <div class="row"><span class="k">邮箱</span><span class="v" id="me-email">…</span></div>
+        <div class="row"><span class="k">名</span><span class="v" id="me-first">…</span></div>
+        <div class="row"><span class="k">姓</span><span class="v" id="me-last">…</span></div>
+      </div>
+    </div>
+
+    <!-- ============ 所有用户（GET /users）============ -->
+    <div class="list-toolbar">
+      <button class="btn ghost small" type="button" id="add-user-btn">＋ 添加用户</button>
+    </div>
+
+    <!-- 添加用户表单：点"＋ 添加用户"时出现；保存 = POST /users（和注册页同一个接口）-->
+    <div class="edit-form" id="add-form" hidden>
+      <p class="ef-title">添加用户</p>
+      <div class="field">
+        <label for="add-email">邮箱</label>
+        <input id="add-email" type="email" placeholder="test@example.com">
+      </div>
+      <div class="field">
+        <label for="add-first">名 first_name</label>
+        <input id="add-first" type="text" placeholder="first name">
+      </div>
+      <div class="field">
+        <label for="add-last">姓 last_name</label>
+        <input id="add-last" type="text" placeholder="last name">
+      </div>
+      <p class="op-msg" id="add-msg" hidden></p>
+      <div class="edit-actions">
+        <button class="btn" type="button" id="add-save">保存</button>
+        <button class="btn ghost" type="button" id="add-cancel">取消</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h3>所有用户</h3>
+      <div class="panel-body">
+        <!-- JS 会清空这个 ul，再按后端返回的数据逐行生成 <li> -->
+        <ul class="users" id="user-list">
+          <li>加载中…</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- ============ 勾中一行后出现：操作条 + 用户详情 ============
+         列表是单选（勾一个会自动取消其它），所以勾中时就是恰好 1 个 -->
+    <div class="selbar" id="selbar" hidden>
+      <span class="selcount" id="selcount">已选 0 个</span>
+      <div class="selbar-actions">
+        <button class="btn ghost" type="button" id="edit-btn" disabled>编辑资料</button>
+        <button class="btn danger" type="button" id="del-btn">删除账号</button>
+      </div>
+    </div>
+
+    <!-- 用户详情：勾选恰好 1 个时出现（GET /users/{id}，这里直接用列表数据）-->
+    <div class="panel" id="detail-view" hidden>
+      <h3>用户详情</h3>
+      <div class="panel-body">
+        <div class="row"><span class="k">ID</span><span class="v" id="d-id"></span></div>
+        <div class="row"><span class="k">邮箱</span><span class="v" id="d-email"></span></div>
+        <div class="row"><span class="k">名</span><span class="v" id="d-first"></span></div>
+        <div class="row"><span class="k">姓</span><span class="v" id="d-last"></span></div>
+        <div class="row"><span class="k">注册时间</span><span class="v" id="d-created"></span></div>
+      </div>
+    </div>
+
+    <!-- 编辑表单：点"编辑资料"时出现；保存 = PUT /users/{id}（三字段全传）-->
+    <div class="edit-form" id="edit-form" hidden>
+      <p class="ef-title">编辑 <b id="ef-name"></b></p>
+      <div class="field">
+        <label for="edit-email">邮箱（不可改）</label>
+        <input id="edit-email" type="email" readonly>
+      </div>
+      <div class="field">
+        <label for="edit-first">名 first_name</label>
+        <input id="edit-first" type="text">
+      </div>
+      <div class="field">
+        <label for="edit-last">姓 last_name</label>
+        <input id="edit-last" type="text">
+      </div>
+      <div class="edit-actions">
+        <button class="btn" type="button" id="save-edit">保存</button>
+        <button class="btn ghost" type="button" id="cancel-edit">取消</button>
+      </div>
+    </div>
+
+    <!-- 删除确认条：点"删除账号"时出现；确定 = 对每个选中的 DELETE /users/{id} -->
+    <div class="confirm" id="del-confirm" hidden>
+      <span id="del-msg">确定要删除选中的账号吗？删除后无法恢复。</span>
+      <div class="confirm-actions">
+        <button class="btn danger" type="button" id="del-ok">确定删除</button>
+        <button class="btn ghost" type="button" id="del-cancel">取消</button>
+      </div>
+    </div>
+
+    <!-- 编辑 / 删除 出错时在这里显示一句话 -->
+    <p class="op-msg" id="op-msg" hidden></p>
+
+    <!-- 这一屏对应哪些后端接口（学习备注，默认隐藏；想看把 hidden 去掉）：
+         · 加载时读 localStorage.currentUser，没有就跳回 login.html
+         · "我的资料"卡 ← GET /users/{id}；"所有用户"列表 ← GET /users
+         · ＋添加用户 → POST /users
+         · 列表是单选：勾一个自动取消其它。勾中 → "用户详情"（GET /users/{id}）
+             → 编辑资料 → PUT /users/{id}
+             → 删除账号 → DELETE /users/{id}（204）
+         · 登出 → localStorage.removeItem("currentUser") → 跳登录页
+    -->
+    <div class="note" hidden>
+      <p>加载时读 <code>localStorage.currentUser</code>，没有就跳回 <code>login.html</code></p>
+      <p>"我的资料"卡 &larr; <code>GET /users/{id}</code>；"所有用户"列表 &larr; <code>GET /users</code>；＋添加用户 &rarr; <code>POST /users</code></p>
+      <p>列表单选：勾中 1 个 &rarr; "用户详情"（<code>GET /users/{id}</code>）&rarr; 编辑资料 <code>PUT /users/{id}</code> / 删除账号 <code>DELETE /users/{id}</code>（<code>204</code>）</p>
+      <p>登出 &rarr; <code>localStorage.removeItem("currentUser")</code> &rarr; 跳登录页</p>
+    </div>
+  </main>
+
+  <script src="api.js"></script>
+  <script>
+    const me = getCurrentUser();
+
+    if (!me) {
+      // 没有登录状态 → 回登录页，下面的代码不再执行
+      location.href = "login.html";
+    } else {
+      // -------- 顶部问候 + 登出 --------
+      document.querySelector(".who").textContent = me.first_name;
+      document.getElementById("logout-btn").addEventListener("click", logout);
+
+      // -------- "我的资料"：GET /users/{id} --------
+      async function loadMyProfile() {
+        try {
+          const res = await fetch(`${API_BASE}/users/${me.id}`);
+          if (!res.ok) return;
+          const u = await res.json();
+          document.getElementById("me-id").textContent = u.id;
+          document.getElementById("me-email").textContent = u.email;
+          document.getElementById("me-first").textContent = u.first_name;
+          document.getElementById("me-last").textContent = u.last_name;
+          document.querySelector(".who").textContent = u.first_name;
+          // 顺手把 localStorage 里的也刷成最新
+          localStorage.setItem("currentUser", JSON.stringify(u));
+        } catch (err) {
+          console.error(err);
+        }
+      }
+
+      // -------- "所有用户"列表：GET /users --------
+      const listEl = document.getElementById("user-list");
+
+      async function loadUserList() {
+        const res = await fetch(`${API_BASE}/users`);
+        const users = await res.json();
+        listEl.innerHTML = "";
+        users.forEach((u) => {
+          const li = document.createElement("li");
+          // 把这一行的数据挂在 li 上，勾选时"用户详情"直接读它
+          li.dataset.id = u.id;
+          li.dataset.first = u.first_name;
+          li.dataset.last = u.last_name;
+          li.dataset.email = u.email;
+          li.dataset.created = (u.created_at || "").replace("T", " ").slice(0, 16);
+          li.innerHTML =
+            '<label class="pick-wrap">' +
+              '<input type="checkbox" class="pick">' +
+              '<span class="name">' + u.first_name + " " + u.last_name + "</span>" +
+              (u.id === me.id ? '<span class="mine">你</span>' : "") +
+            "</label>" +
+            '<span class="email">' + u.email + "</span>";
+          listEl.appendChild(li);
+        });
+        refreshSelection();
+      }
+
+      // -------- 勾选 → 操作条 + 用户详情 --------
+      const selbar = document.getElementById("selbar");
+      const selcount = document.getElementById("selcount");
+      const detailView = document.getElementById("detail-view");
+      const editBtn = document.getElementById("edit-btn");
+      const delBtn = document.getElementById("del-btn");
+      const editForm = document.getElementById("edit-form");
+      const delConfirm = document.getElementById("del-confirm");
+      const opMsg = document.getElementById("op-msg");
+      const addForm = document.getElementById("add-form");
+      const addMsg = document.getElementById("add-msg");
+
+      function pickedRows() {
+        return Array.prototype.slice
+          .call(listEl.querySelectorAll("li"))
+          .filter((li) => {
+            const cb = li.querySelector(".pick");
+            return cb && cb.checked;
+          });
+      }
+
+      function showOpMsg(text) {
+        opMsg.textContent = text;
+        opMsg.hidden = false;
+      }
+
+      function refreshSelection() {
+        const rows = pickedRows();
+        const n = rows.length;
+        selbar.hidden = n === 0;
+        selcount.textContent = "已选 " + n + " 个";
+        editBtn.disabled = n !== 1; // 编辑一次只能改一个
+
+        // 选中变化时，收起编辑表单、删除确认条、上一条操作提示
+        editForm.hidden = true;
+        delConfirm.hidden = true;
+        opMsg.hidden = true;
+
+        if (n === 1) {
+          const li = rows[0];
+          document.getElementById("d-id").textContent = li.dataset.id;
+          document.getElementById("d-email").textContent = li.dataset.email;
+          document.getElementById("d-first").textContent = li.dataset.first;
+          document.getElementById("d-last").textContent = li.dataset.last;
+          document.getElementById("d-created").textContent = li.dataset.created || "—";
+          detailView.hidden = false;
+        } else {
+          detailView.hidden = true;
+        }
+      }
+
+      listEl.addEventListener("change", (e) => {
+        if (!e.target.classList.contains("pick")) return;
+        // 单选：勾一个就把其它的取消，永远只保留最后勾的这个
+        // （所以"已选"最多是 1 个，用户详情/编辑始终可用）
+        if (e.target.checked) {
+          listEl.querySelectorAll(".pick").forEach((cb) => {
+            if (cb !== e.target) cb.checked = false;
+          });
+        }
+        refreshSelection();
+      });
+
+      // -------- 添加用户：POST /users（和注册页同一个接口）--------
+      document.getElementById("add-user-btn").addEventListener("click", () => {
+        // 切换显隐；打开时清空上次的输入和提示，并收起其它表单
+        if (addForm.hidden) {
+          addForm.querySelectorAll("input").forEach((i) => (i.value = ""));
+          addMsg.hidden = true;
+          editForm.hidden = true;
+          delConfirm.hidden = true;
+          addForm.hidden = false;
+        } else {
+          addForm.hidden = true;
+        }
+      });
+
+      document.getElementById("add-cancel").addEventListener("click", () => {
+        addForm.hidden = true;
+      });
+
+      document.getElementById("add-save").addEventListener("click", async () => {
+        const payload = {
+          email: document.getElementById("add-email").value.trim(),
+          first_name: document.getElementById("add-first").value.trim(),
+          last_name: document.getElementById("add-last").value.trim(),
+        };
+        try {
+          const res = await fetch(`${API_BASE}/users`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+          if (res.status === 200) {
+            addForm.hidden = true;
+            await loadUserList(); // 重新拉列表，新用户就出现在里面
+          } else if (res.status === 400) {
+            addMsg.textContent = "这个邮箱已经注册过了。";
+            addMsg.hidden = false;
+          } else if (res.status === 422) {
+            addMsg.textContent = "填写有误：邮箱格式要正确，三个字段都不能空。";
+            addMsg.hidden = false;
+          } else {
+            addMsg.textContent = "添加失败，服务器返回状态码 " + res.status + "。";
+            addMsg.hidden = false;
+          }
+        } catch (err) {
+          console.error(err);
+          addMsg.textContent = "连不上服务器。";
+          addMsg.hidden = false;
+        }
+      });
+
+      // -------- 编辑：PUT /users/{id} --------
+      editBtn.addEventListener("click", () => {
+        const rows = pickedRows();
+        if (rows.length !== 1) return;
+        const li = rows[0];
+        document.getElementById("ef-name").textContent =
+          li.dataset.first + " " + li.dataset.last;
+        document.getElementById("edit-email").value = li.dataset.email;
+        document.getElementById("edit-first").value = li.dataset.first;
+        document.getElementById("edit-last").value = li.dataset.last;
+        addForm.hidden = true;
+        delConfirm.hidden = true;
+        opMsg.hidden = true;
+        editForm.hidden = false;
+      });
+
+      document.getElementById("cancel-edit").addEventListener("click", () => {
+        editForm.hidden = true;
+      });
+
+      document.getElementById("save-edit").addEventListener("click", async () => {
+        const rows = pickedRows();
+        if (rows.length !== 1) return;
+        const li = rows[0];
+        // PUT 是"整体替换"，三个字段都要传（email 不给改，用原值）
+        const payload = {
+          email: li.dataset.email,
+          first_name: document.getElementById("edit-first").value.trim(),
+          last_name: document.getElementById("edit-last").value.trim(),
+        };
+        try {
+          const res = await fetch(`${API_BASE}/users/${li.dataset.id}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+          if (res.status === 200) {
+            const u = await res.json();
+            li.dataset.first = u.first_name;
+            li.dataset.last = u.last_name;
+            li.querySelector(".name").textContent =
+              u.first_name + " " + u.last_name;
+            // 改的是自己 → 同步"我的资料"卡、问候语、localStorage
+            if (String(u.id) === String(me.id)) {
+              document.getElementById("me-first").textContent = u.first_name;
+              document.getElementById("me-last").textContent = u.last_name;
+              document.querySelector(".who").textContent = u.first_name;
+              localStorage.setItem("currentUser", JSON.stringify(u));
+            }
+            editForm.hidden = true;
+            refreshSelection(); // 刷新"用户详情"
+          } else if (res.status === 404) {
+            showOpMsg("这个用户已经不存在了，刷新一下列表。");
+          } else {
+            showOpMsg("保存失败，服务器返回状态码 " + res.status + "。");
+          }
+        } catch (err) {
+          console.error(err);
+          showOpMsg("连不上服务器。");
+        }
+      });
+
+      // -------- 删除：对每个选中的 DELETE /users/{id} --------
+      delBtn.addEventListener("click", () => {
+        const rows = pickedRows();
+        if (!rows.length) return;
+        const li = rows[0];
+        document.getElementById("del-msg").textContent =
+          `确定要删除 ${li.dataset.first} ${li.dataset.last}（${li.dataset.email}）吗？删除后无法恢复。`;
+        addForm.hidden = true;
+        editForm.hidden = true;
+        opMsg.hidden = true;
+        delConfirm.hidden = false;
+      });
+
+      document.getElementById("del-cancel").addEventListener("click", () => {
+        delConfirm.hidden = true;
+      });
+
+      document.getElementById("del-ok").addEventListener("click", async () => {
+        const rows = pickedRows();
+        if (!rows.length) return;
+        delConfirm.hidden = true;
+
+        const deletedSelf = rows.some(
+          (li) => String(li.dataset.id) === String(me.id)
+        );
+
+        let failed = 0;
+        for (const li of rows) {
+          try {
+            const res = await fetch(`${API_BASE}/users/${li.dataset.id}`, {
+              method: "DELETE",
+            });
+            // 204 = 删除成功、空响应体；404 也当"已经没了"
+            if (res.status === 204 || res.status === 404) {
+              li.remove();
+            } else {
+              failed += 1;
+            }
+          } catch (err) {
+            console.error(err);
+            failed += 1;
+          }
+        }
+
+        if (deletedSelf) {
+          // 把自己删了 → 清 localStorage 回登录页
+          logout();
+          return;
+        }
+
+        refreshSelection();
+        if (failed > 0) showOpMsg(failed + " 个删除失败，其余已删除。");
+      });
+
+      // -------- 启动：拉数据 --------
+      loadMyProfile();
+      loadUserList().catch((err) => {
+        console.error(err);
+        listEl.innerHTML =
+          "<li>连不上服务器。确认后端已启动、CORS 已放行本页面。</li>";
+      });
+    }
+  </script>
+</body>
+</html>

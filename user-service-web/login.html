@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>登录 · User Service</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="wrap">
+    <header class="page-head">
+      <p class="kicker">user-service-web</p>
+      <h1>登录</h1>
+    </header>
+
+    <div class="card">
+      <h2>登录 User Service</h2>
+      <p class="sub">输入注册时用的邮箱即可进入（这一版没有密码）。</p>
+
+      <!-- 登录失败时，JS 会去掉 hidden 让它显示，并改写 .alert-msg 的内容 -->
+      <div class="alert" hidden>
+        <span>&#9888;</span>
+        <div class="alert-msg"><b>邮箱未注册。</b>请检查拼写，或先去注册一个账号。</div>
+      </div>
+
+      <div class="field">
+        <label for="email">邮箱</label>
+        <input id="email" type="email" placeholder="test@example.com" autocomplete="email">
+      </div>
+
+      <button class="btn block" type="button" id="login-btn">登录</button>
+
+      <p class="switch">没有账号？<a href="register.html">去注册</a></p>
+    </div>
+  </main>
+
+  <script src="api.js"></script>
+  <script>
+    const btn = document.getElementById("login-btn");
+    const emailInput = document.getElementById("email");
+    const alertBox = document.querySelector(".alert");
+    const alertMsg = document.querySelector(".alert-msg");
+
+    // 如果本地已经有登录状态，直接进主页，跳过登录页
+    if (getCurrentUser()) {
+      location.href = "index.html";
+    }
+
+    // 从注册页跳过来的（?registered=1&email=...）→ 预填刚注册的邮箱 + 绿色成功提示
+    const params = new URLSearchParams(location.search);
+    if (params.get("registered") === "1") {
+      const justRegistered = params.get("email");
+      if (justRegistered) emailInput.value = justRegistered;
+      alertMsg.textContent = "注册成功，请用这个邮箱登录。";
+      alertBox.classList.add("ok");
+      alertBox.hidden = false;
+    }
+
+    btn.addEventListener("click", async () => {
+      const email = emailInput.value.trim();
+      alertBox.hidden = true;
+      alertBox.classList.remove("ok"); // 上一条可能是绿色的"注册成功"，失败提示要用红色
+
+      try {
+        // fetch 向后端发一个 POST 请求，body 是 JSON
+        const res = await fetch(`${API_BASE}/auth/login`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email }),
+        });
+
+        if (res.status === 200) {
+          // 登录成功：把后端返回的整个用户对象存进 localStorage，然后跳主页
+          const user = await res.json();
+          localStorage.setItem("currentUser", JSON.stringify(user));
+          location.href = "index.html";
+          return;
+        }
+
+        // 失败：按状态码给不同提示
+        if (res.status === 401) {
+          alertMsg.innerHTML = "<b>邮箱未注册。</b>请检查拼写，或先去注册一个账号。";
+        } else if (res.status === 422) {
+          alertMsg.innerHTML = "<b>邮箱格式不对。</b>请输入一个有效的邮箱地址。";
+        } else {
+          alertMsg.innerHTML = "<b>登录失败。</b>服务器返回状态码 " + res.status + "。";
+        }
+        alertBox.hidden = false;
+      } catch (err) {
+        // fetch 直接抛错：多半是后端没启动，或 CORS 没放行这个页面
+        alertMsg.innerHTML =
+          "<b>连不上服务器。</b>确认后端已启动（<code>uvicorn app.main:app</code>），且 CORS 已放行本页面。";
+        alertBox.hidden = false;
+        console.error(err);
+      }
+    });
+
+    // 输入框里按回车 = 点登录
+    emailInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") btn.click();
+    });
+  </script>
+</body>
+</html>
