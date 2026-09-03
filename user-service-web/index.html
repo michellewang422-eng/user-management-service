@@ -37,6 +37,32 @@
     </div>
 
     <!-- ============ 所有用户（GET /users）============ -->
+    <div class="list-toolbar">
+      <button class="btn ghost small" type="button" id="add-user-btn">＋ 添加用户</button>
+    </div>
+
+    <!-- 添加用户表单：点"＋ 添加用户"时出现；保存 = POST /users（和注册页同一个接口）-->
+    <div class="edit-form" id="add-form" hidden>
+      <p class="ef-title">添加用户</p>
+      <div class="field">
+        <label for="add-email">邮箱</label>
+        <input id="add-email" type="email" placeholder="test@example.com">
+      </div>
+      <div class="field">
+        <label for="add-first">名 first_name</label>
+        <input id="add-first" type="text" placeholder="first name">
+      </div>
+      <div class="field">
+        <label for="add-last">姓 last_name</label>
+        <input id="add-last" type="text" placeholder="last name">
+      </div>
+      <p class="op-msg" id="add-msg" hidden></p>
+      <div class="edit-actions">
+        <button class="btn" type="button" id="add-save">保存</button>
+        <button class="btn ghost" type="button" id="add-cancel">取消</button>
+      </div>
+    </div>
+
     <div class="panel">
       <h3>所有用户</h3>
       <div class="panel-body">
@@ -47,11 +73,11 @@
       </div>
     </div>
 
-    <!-- ============ 勾选后出现：操作条 + 用户详情 ============ -->
+    <!-- ============ 勾中一行后出现：操作条 + 用户详情 ============
+         列表是单选（勾一个会自动取消其它），所以勾中时就是恰好 1 个 -->
     <div class="selbar" id="selbar" hidden>
       <span class="selcount" id="selcount">已选 0 个</span>
       <div class="selbar-actions">
-        <!-- "编辑资料" 只在选中恰好 1 个时可点，由 JS 控制 disabled -->
         <button class="btn ghost" type="button" id="edit-btn" disabled>编辑资料</button>
         <button class="btn danger" type="button" id="del-btn">删除账号</button>
       </div>
@@ -105,15 +131,16 @@
     <!-- 这一屏对应哪些后端接口（学习备注，默认隐藏；想看把 hidden 去掉）：
          · 加载时读 localStorage.currentUser，没有就跳回 login.html
          · "我的资料"卡 ← GET /users/{id}；"所有用户"列表 ← GET /users
-         · 勾选 1 个 → "用户详情"（GET /users/{id}）→ 编辑资料 → PUT /users/{id}
-         · 勾选 1 个或多个 → 删除账号 → 对每个选中的 DELETE /users/{id}（204）
+         · ＋添加用户 → POST /users
+         · 列表是单选：勾一个自动取消其它。勾中 → "用户详情"（GET /users/{id}）
+             → 编辑资料 → PUT /users/{id}
+             → 删除账号 → DELETE /users/{id}（204）
          · 登出 → localStorage.removeItem("currentUser") → 跳登录页
     -->
     <div class="note" hidden>
       <p>加载时读 <code>localStorage.currentUser</code>，没有就跳回 <code>login.html</code></p>
-      <p>"我的资料"卡 &larr; <code>GET /users/{id}</code>；"所有用户"列表 &larr; <code>GET /users</code></p>
-      <p>勾选 1 个 &rarr; "用户详情"（<code>GET /users/{id}</code>）&rarr; 编辑资料 &rarr; <code>PUT /users/{id}</code></p>
-      <p>勾选 1 个或多个 &rarr; 删除账号 &rarr; 对每个选中的 <code>DELETE /users/{id}</code>（<code>204</code>）</p>
+      <p>"我的资料"卡 &larr; <code>GET /users/{id}</code>；"所有用户"列表 &larr; <code>GET /users</code>；＋添加用户 &rarr; <code>POST /users</code></p>
+      <p>列表单选：勾中 1 个 &rarr; "用户详情"（<code>GET /users/{id}</code>）&rarr; 编辑资料 <code>PUT /users/{id}</code> / 删除账号 <code>DELETE /users/{id}</code>（<code>204</code>）</p>
       <p>登出 &rarr; <code>localStorage.removeItem("currentUser")</code> &rarr; 跳登录页</p>
     </div>
   </main>
@@ -184,6 +211,8 @@
       const editForm = document.getElementById("edit-form");
       const delConfirm = document.getElementById("del-confirm");
       const opMsg = document.getElementById("op-msg");
+      const addForm = document.getElementById("add-form");
+      const addMsg = document.getElementById("add-msg");
 
       function pickedRows() {
         return Array.prototype.slice
@@ -225,7 +254,65 @@
       }
 
       listEl.addEventListener("change", (e) => {
-        if (e.target.classList.contains("pick")) refreshSelection();
+        if (!e.target.classList.contains("pick")) return;
+        // 单选：勾一个就把其它的取消，永远只保留最后勾的这个
+        // （所以"已选"最多是 1 个，用户详情/编辑始终可用）
+        if (e.target.checked) {
+          listEl.querySelectorAll(".pick").forEach((cb) => {
+            if (cb !== e.target) cb.checked = false;
+          });
+        }
+        refreshSelection();
+      });
+
+      // -------- 添加用户：POST /users（和注册页同一个接口）--------
+      document.getElementById("add-user-btn").addEventListener("click", () => {
+        // 切换显隐；打开时清空上次的输入和提示，并收起其它表单
+        if (addForm.hidden) {
+          addForm.querySelectorAll("input").forEach((i) => (i.value = ""));
+          addMsg.hidden = true;
+          editForm.hidden = true;
+          delConfirm.hidden = true;
+          addForm.hidden = false;
+        } else {
+          addForm.hidden = true;
+        }
+      });
+
+      document.getElementById("add-cancel").addEventListener("click", () => {
+        addForm.hidden = true;
+      });
+
+      document.getElementById("add-save").addEventListener("click", async () => {
+        const payload = {
+          email: document.getElementById("add-email").value.trim(),
+          first_name: document.getElementById("add-first").value.trim(),
+          last_name: document.getElementById("add-last").value.trim(),
+        };
+        try {
+          const res = await fetch(`${API_BASE}/users`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+          if (res.status === 200) {
+            addForm.hidden = true;
+            await loadUserList(); // 重新拉列表，新用户就出现在里面
+          } else if (res.status === 400) {
+            addMsg.textContent = "这个邮箱已经注册过了。";
+            addMsg.hidden = false;
+          } else if (res.status === 422) {
+            addMsg.textContent = "填写有误：邮箱格式要正确，三个字段都不能空。";
+            addMsg.hidden = false;
+          } else {
+            addMsg.textContent = "添加失败，服务器返回状态码 " + res.status + "。";
+            addMsg.hidden = false;
+          }
+        } catch (err) {
+          console.error(err);
+          addMsg.textContent = "连不上服务器。";
+          addMsg.hidden = false;
+        }
       });
 
       // -------- 编辑：PUT /users/{id} --------
@@ -238,6 +325,7 @@
         document.getElementById("edit-email").value = li.dataset.email;
         document.getElementById("edit-first").value = li.dataset.first;
         document.getElementById("edit-last").value = li.dataset.last;
+        addForm.hidden = true;
         delConfirm.hidden = true;
         opMsg.hidden = true;
         editForm.hidden = false;
@@ -291,10 +379,12 @@
 
       // -------- 删除：对每个选中的 DELETE /users/{id} --------
       delBtn.addEventListener("click", () => {
-        const n = pickedRows().length;
-        if (!n) return;
+        const rows = pickedRows();
+        if (!rows.length) return;
+        const li = rows[0];
         document.getElementById("del-msg").textContent =
-          "确定要删除选中的 " + n + " 个账号吗？删除后无法恢复。";
+          `确定要删除 ${li.dataset.first} ${li.dataset.last}（${li.dataset.email}）吗？删除后无法恢复。`;
+        addForm.hidden = true;
         editForm.hidden = true;
         opMsg.hidden = true;
         delConfirm.hidden = false;

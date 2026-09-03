@@ -195,6 +195,18 @@ h2 {
   cursor: not-allowed;
 }
 
+.btn.small {
+  padding: 5px 10px;
+  font-size: 12px;
+}
+
+/* "所有用户"列表上方的小工具条（放"＋ 添加用户"按钮）*/
+.list-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 8px;
+}
+
 .btn:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
