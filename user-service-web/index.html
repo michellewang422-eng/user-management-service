@@ -47,15 +47,13 @@
       </div>
     </div>
 
-    <!-- ============ 勾选后出现：操作条 + 用户详情 ============
-         PR-13：只做"勾选 → 显示详情"；
-         "编辑资料" / "删除账号" 的写操作留到 PR-14
-    -->
+    <!-- ============ 勾选后出现：操作条 + 用户详情 ============ -->
     <div class="selbar" id="selbar" hidden>
       <span class="selcount" id="selcount">已选 0 个</span>
       <div class="selbar-actions">
+        <!-- "编辑资料" 只在选中恰好 1 个时可点，由 JS 控制 disabled -->
         <button class="btn ghost" type="button" id="edit-btn" disabled>编辑资料</button>
-        <button class="btn danger" type="button" id="del-btn" disabled>删除账号</button>
+        <button class="btn danger" type="button" id="del-btn">删除账号</button>
       </div>
     </div>
 
@@ -71,7 +69,7 @@
       </div>
     </div>
 
-    <!-- 编辑表单：PR-14 会用 JS 控制显隐并接上 PUT /users/{id} -->
+    <!-- 编辑表单：点"编辑资料"时出现；保存 = PUT /users/{id}（三字段全传）-->
     <div class="edit-form" id="edit-form" hidden>
       <p class="ef-title">编辑 <b id="ef-name"></b></p>
       <div class="field">
@@ -92,7 +90,7 @@
       </div>
     </div>
 
-    <!-- 删除确认条：PR-14 会用 JS 控制显隐并接上 DELETE /users/{id} -->
+    <!-- 删除确认条：点"删除账号"时出现；确定 = 对每个选中的 DELETE /users/{id} -->
     <div class="confirm" id="del-confirm" hidden>
       <span id="del-msg">确定要删除选中的账号吗？删除后无法恢复。</span>
       <div class="confirm-actions">
@@ -101,11 +99,14 @@
       </div>
     </div>
 
+    <!-- 编辑 / 删除 出错时在这里显示一句话 -->
+    <p class="op-msg" id="op-msg" hidden></p>
+
     <div class="note">
       <p>加载时读 <code>localStorage.currentUser</code>，没有就跳回 <code>login.html</code></p>
       <p>"我的资料"卡 &larr; <code>GET /users/{id}</code>；"所有用户"列表 &larr; <code>GET /users</code></p>
-      <p>勾选 1 个 &rarr; "用户详情"（<code>GET /users/{id}</code>）&rarr; 编辑资料 &rarr; <code>PUT /users/{id}</code>（PR-14）</p>
-      <p>勾选 1 个或多个 &rarr; 删除账号 &rarr; 对每个选中的 <code>DELETE /users/{id}</code>（PR-14）</p>
+      <p>勾选 1 个 &rarr; "用户详情"（<code>GET /users/{id}</code>）&rarr; 编辑资料 &rarr; <code>PUT /users/{id}</code></p>
+      <p>勾选 1 个或多个 &rarr; 删除账号 &rarr; 对每个选中的 <code>DELETE /users/{id}</code>（<code>204</code>）</p>
       <p>登出 &rarr; <code>localStorage.removeItem("currentUser")</code> &rarr; 跳登录页</p>
     </div>
   </main>
@@ -167,10 +168,15 @@
         refreshSelection();
       }
 
-      // -------- 勾选 → 用户详情 --------
+      // -------- 勾选 → 操作条 + 用户详情 --------
       const selbar = document.getElementById("selbar");
       const selcount = document.getElementById("selcount");
       const detailView = document.getElementById("detail-view");
+      const editBtn = document.getElementById("edit-btn");
+      const delBtn = document.getElementById("del-btn");
+      const editForm = document.getElementById("edit-form");
+      const delConfirm = document.getElementById("del-confirm");
+      const opMsg = document.getElementById("op-msg");
 
       function pickedRows() {
         return Array.prototype.slice
@@ -181,11 +187,22 @@
           });
       }
 
+      function showOpMsg(text) {
+        opMsg.textContent = text;
+        opMsg.hidden = false;
+      }
+
       function refreshSelection() {
         const rows = pickedRows();
         const n = rows.length;
         selbar.hidden = n === 0;
         selcount.textContent = "已选 " + n + " 个";
+        editBtn.disabled = n !== 1; // 编辑一次只能改一个
+
+        // 选中变化时，收起编辑表单、删除确认条、上一条操作提示
+        editForm.hidden = true;
+        delConfirm.hidden = true;
+        opMsg.hidden = true;
 
         if (n === 1) {
           const li = rows[0];
@@ -202,6 +219,119 @@
 
       listEl.addEventListener("change", (e) => {
         if (e.target.classList.contains("pick")) refreshSelection();
+      });
+
+      // -------- 编辑：PUT /users/{id} --------
+      editBtn.addEventListener("click", () => {
+        const rows = pickedRows();
+        if (rows.length !== 1) return;
+        const li = rows[0];
+        document.getElementById("ef-name").textContent =
+          li.dataset.first + " " + li.dataset.last;
+        document.getElementById("edit-email").value = li.dataset.email;
+        document.getElementById("edit-first").value = li.dataset.first;
+        document.getElementById("edit-last").value = li.dataset.last;
+        delConfirm.hidden = true;
+        opMsg.hidden = true;
+        editForm.hidden = false;
+      });
+
+      document.getElementById("cancel-edit").addEventListener("click", () => {
+        editForm.hidden = true;
+      });
+
+      document.getElementById("save-edit").addEventListener("click", async () => {
+        const rows = pickedRows();
+        if (rows.length !== 1) return;
+        const li = rows[0];
+        // PUT 是"整体替换"，三个字段都要传（email 不给改，用原值）
+        const payload = {
+          email: li.dataset.email,
+          first_name: document.getElementById("edit-first").value.trim(),
+          last_name: document.getElementById("edit-last").value.trim(),
+        };
+        try {
+          const res = await fetch(`${API_BASE}/users/${li.dataset.id}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+          if (res.status === 200) {
+            const u = await res.json();
+            li.dataset.first = u.first_name;
+            li.dataset.last = u.last_name;
+            li.querySelector(".name").textContent =
+              u.first_name + " " + u.last_name;
+            // 改的是自己 → 同步"我的资料"卡、问候语、localStorage
+            if (String(u.id) === String(me.id)) {
+              document.getElementById("me-first").textContent = u.first_name;
+              document.getElementById("me-last").textContent = u.last_name;
+              document.querySelector(".who").textContent = u.first_name;
+              localStorage.setItem("currentUser", JSON.stringify(u));
+            }
+            editForm.hidden = true;
+            refreshSelection(); // 刷新"用户详情"
+          } else if (res.status === 404) {
+            showOpMsg("这个用户已经不存在了，刷新一下列表。");
+          } else {
+            showOpMsg("保存失败，服务器返回状态码 " + res.status + "。");
+          }
+        } catch (err) {
+          console.error(err);
+          showOpMsg("连不上服务器。");
+        }
+      });
+
+      // -------- 删除：对每个选中的 DELETE /users/{id} --------
+      delBtn.addEventListener("click", () => {
+        const n = pickedRows().length;
+        if (!n) return;
+        document.getElementById("del-msg").textContent =
+          "确定要删除选中的 " + n + " 个账号吗？删除后无法恢复。";
+        editForm.hidden = true;
+        opMsg.hidden = true;
+        delConfirm.hidden = false;
+      });
+
+      document.getElementById("del-cancel").addEventListener("click", () => {
+        delConfirm.hidden = true;
+      });
+
+      document.getElementById("del-ok").addEventListener("click", async () => {
+        const rows = pickedRows();
+        if (!rows.length) return;
+        delConfirm.hidden = true;
+
+        const deletedSelf = rows.some(
+          (li) => String(li.dataset.id) === String(me.id)
+        );
+
+        let failed = 0;
+        for (const li of rows) {
+          try {
+            const res = await fetch(`${API_BASE}/users/${li.dataset.id}`, {
+              method: "DELETE",
+            });
+            // 204 = 删除成功、空响应体；404 也当"已经没了"
+            if (res.status === 204 || res.status === 404) {
+              li.remove();
+            } else {
+              failed += 1;
+            }
+          } catch (err) {
+            console.error(err);
+            failed += 1;
+          }
+        }
+
+        if (deletedSelf) {
+          // 把自己删了 → 清 localStorage 回登录页
+          logout();
+          return;
+        }
+
+        refreshSelection();
+        if (failed > 0) showOpMsg(failed + " 个删除失败，其余已删除。");
       });
 
       // -------- 启动：拉数据 --------

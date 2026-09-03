@@ -232,6 +232,20 @@ h2 {
 
 .alert b { font-weight: 600; }
 
+/* 成功版提示（比如"注册成功，请登录"）——绿色 */
+.alert.ok {
+  background: color-mix(in srgb, var(--success) 14%, var(--surface));
+  color: var(--success);
+  border-color: var(--success);
+}
+
+/* 编辑 / 删除操作出错时的一行提示 */
+.op-msg {
+  margin: -4px 0 18px;
+  font-size: 13px;
+  color: var(--danger);
+}
+
 /* ================================================================
    主页 index.html 专用
    ================================================================ */

@@ -22,10 +22,10 @@
       <h2>注册新账号</h2>
       <p class="sub">填三个字段，注册成功后回登录页。</p>
 
-      <!-- PR-13/14 会加 JS：注册失败（邮箱已存在等）时显示 -->
+      <!-- 注册失败时，JS 去掉 hidden、改写 .alert-msg -->
       <div class="alert" hidden>
         <span>&#9888;</span>
-        <div><b>这个邮箱已经注册过了。</b>换一个，或直接去登录。</div>
+        <div class="alert-msg"><b>这个邮箱已经注册过了。</b>换一个，或直接去登录。</div>
       </div>
 
       <div class="field">
@@ -41,11 +41,58 @@
         <input id="last-name" type="text" placeholder="Wang">
       </div>
 
-      <!-- PR-12：先用 <a> 跳回登录页；PR-14：换成 <button>，fetch POST /users -->
-      <a class="btn block" href="login.html">注册</a>
+      <button class="btn block" type="button" id="register-btn">注册</button>
 
       <p class="switch">已有账号？<a href="login.html">去登录</a></p>
     </div>
   </main>
+
+  <script src="api.js"></script>
+  <script>
+    const btn = document.getElementById("register-btn");
+    const emailInput = document.getElementById("email");
+    const firstInput = document.getElementById("first-name");
+    const lastInput = document.getElementById("last-name");
+    const alertBox = document.querySelector(".alert");
+    const alertMsg = document.querySelector(".alert-msg");
+
+    btn.addEventListener("click", async () => {
+      alertBox.hidden = true;
+
+      const payload = {
+        email: emailInput.value.trim(),
+        first_name: firstInput.value.trim(),
+        last_name: lastInput.value.trim(),
+      };
+
+      try {
+        const res = await fetch(`${API_BASE}/users`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+
+        if (res.status === 200) {
+          // 注册成功 → 回登录页，带个标记让登录页显示"注册成功"提示
+          location.href = "login.html?registered=1";
+          return;
+        }
+
+        if (res.status === 400) {
+          alertMsg.innerHTML = "<b>这个邮箱已经注册过了。</b>换一个，或直接去登录。";
+        } else if (res.status === 422) {
+          alertMsg.innerHTML = "<b>填写有误。</b>邮箱格式要正确，三个字段都不能空。";
+        } else {
+          alertMsg.innerHTML = "<b>注册失败。</b>服务器返回状态码 " + res.status + "。";
+        }
+        alertBox.hidden = false;
+      } catch (err) {
+        alertMsg.innerHTML =
+          "<b>连不上服务器。</b>确认后端已启动，且 CORS 已放行本页面。";
+        alertBox.hidden = false;
+        console.error(err);
+      }
+    });
+  </script>
 </body>
 </html>

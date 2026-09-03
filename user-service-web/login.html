@@ -51,9 +51,17 @@
       location.href = "index.html";
     }
 
+    // 从注册页跳过来的（?registered=1）→ 显示一条绿色的成功提示
+    if (new URLSearchParams(location.search).get("registered") === "1") {
+      alertMsg.textContent = "注册成功，请用这个邮箱登录。";
+      alertBox.classList.add("ok");
+      alertBox.hidden = false;
+    }
+
     btn.addEventListener("click", async () => {
       const email = emailInput.value.trim();
       alertBox.hidden = true;
+      alertBox.classList.remove("ok"); // 上一条可能是绿色的"注册成功"，失败提示要用红色
 
       try {
         // fetch 向后端发一个 POST 请求，body 是 JSON
