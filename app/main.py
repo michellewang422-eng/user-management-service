@@ -1,4 +1,6 @@
 from fastapi import FastAPI
+# CORSMiddleware：控制"允许哪些来源的网页调用这个后端"
+from fastapi.middleware.cors import CORSMiddleware
 
 # Base：总登记处；engine：数据库连接引擎，两者都在database.py里定义好
 from app.database import Base, engine
@@ -12,6 +14,25 @@ from app.routers import users, auth
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
+
+# ---- CORS ----
+# 前端页面（user-service-web/ 里的 html）和这个后端不是同一个"源"：
+# "源" = 协议 + 域名 + 端口，三者都一样才算同源。
+# 前端一般跑在 http://127.0.0.1:5500 之类，后端在 http://127.0.0.1:8000，端口不同 = 不同源。
+# 浏览器出于安全，默认禁止网页向"另一个源"的接口发请求（会看到 CORS 报错）。
+# 下面明确列出前端页面的地址，告诉浏览器"这些源可以访问我"。
+# 端口按你实际打开前端用的改：VS Code Live Server 常见是 5500，python -m http.server 是你指定的那个。
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:5500",
+        "http://127.0.0.1:5500",
+        "http://localhost:8777",
+        "http://127.0.0.1:8777",
+    ],
+    allow_methods=["*"],   # 允许 GET/POST/PUT/DELETE 等所有方法
+    allow_headers=["*"],   # 允许所有请求头（比如 Content-Type）
+)
 
 # 把各个router正式"挂载"到主应用app上
 # 之后路由越来越多，只需要不断include_router，不用把所有代码堆在这一个文件里

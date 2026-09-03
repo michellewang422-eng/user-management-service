@@ -20,132 +20,198 @@
 
     <!-- ============ 顶部问候 + 登出 ============ -->
     <div class="greet">
-      <h2>你好，<span class="who">Alice</span></h2>
+      <h2>你好，<span class="who">…</span></h2>
       <span class="tag">已登录</span>
-      <!-- PR-12：<a> 跳回登录页；PR-14：换 <button>，清 localStorage 再跳 -->
-      <a class="btn ghost logout" href="login.html">登出</a>
+      <button class="btn ghost logout" type="button" id="logout-btn">登出</button>
     </div>
 
-    <!-- ============ 我的资料（当前登录用户）============ -->
-    <!-- PR-13：用 GET /users/{id} 拉当前用户，填进下面这几行 -->
+    <!-- ============ 我的资料（当前登录用户，GET /users/{id}）============ -->
     <div class="panel">
       <h3>我的资料</h3>
       <div class="panel-body">
-        <div class="row"><span class="k">ID</span><span class="v">1</span></div>
-        <div class="row"><span class="k">邮箱</span><span class="v">alice@example.com</span></div>
-        <div class="row"><span class="k">名</span><span class="v">Alice</span></div>
-        <div class="row"><span class="k">姓</span><span class="v">Anderson</span></div>
+        <div class="row"><span class="k">ID</span><span class="v" id="me-id">…</span></div>
+        <div class="row"><span class="k">邮箱</span><span class="v" id="me-email">…</span></div>
+        <div class="row"><span class="k">名</span><span class="v" id="me-first">…</span></div>
+        <div class="row"><span class="k">姓</span><span class="v" id="me-last">…</span></div>
       </div>
     </div>
 
-    <!-- ============ 所有用户 ============ -->
-    <!-- PR-13：用 GET /users 拉列表，循环生成下面的 <li>；每行一个 checkbox -->
+    <!-- ============ 所有用户（GET /users）============ -->
     <div class="panel">
       <h3>所有用户</h3>
       <div class="panel-body">
-        <ul class="users">
-          <li>
-            <label class="pick-wrap">
-              <input type="checkbox">
-              <span class="name">Alice Anderson</span>
-              <span class="mine">你</span>
-            </label>
-            <span class="email">alice@example.com</span>
-          </li>
-          <li>
-            <label class="pick-wrap">
-              <input type="checkbox">
-              <span class="name">Bob Brown</span>
-            </label>
-            <span class="email">bob@example.com</span>
-          </li>
-          <li>
-            <label class="pick-wrap">
-              <input type="checkbox">
-              <span class="name">Carol Chen</span>
-            </label>
-            <span class="email">carol@example.com</span>
-          </li>
-          <li>
-            <label class="pick-wrap">
-              <input type="checkbox">
-              <span class="name">Dan Davis</span>
-            </label>
-            <span class="email">dan@example.com</span>
-          </li>
+        <!-- JS 会清空这个 ul，再按后端返回的数据逐行生成 <li> -->
+        <ul class="users" id="user-list">
+          <li>加载中…</li>
         </ul>
       </div>
     </div>
 
-    <!-- ============ 下面这三块：勾选用户后才会出现 ============
-         PR-12 阶段先都显示出来，把版式和样式排好；
-         PR-13/PR-14 会用 JS 控制它们的显隐：
-           - 选中 >= 1 个  → 显示"操作条"
-           - 选中恰好 1 个 → 显示"用户详情"
-           - 点"编辑资料"  → 显示"编辑表单"
-           - 点"删除账号"  → 显示"删除确认条"
+    <!-- ============ 勾选后出现：操作条 + 用户详情 ============
+         PR-13：只做"勾选 → 显示详情"；
+         "编辑资料" / "删除账号" 的写操作留到 PR-14
     -->
-
-    <!-- 操作条：勾选后出现 -->
-    <div class="selbar">
-      <span class="selcount">已选 1 个</span>
+    <div class="selbar" id="selbar" hidden>
+      <span class="selcount" id="selcount">已选 0 个</span>
       <div class="selbar-actions">
-        <!-- 选中数 ≠ 1 时，PR-14 会给这个按钮加 disabled -->
-        <button class="btn ghost" type="button">编辑资料</button>
-        <button class="btn danger" type="button">删除账号</button>
+        <button class="btn ghost" type="button" id="edit-btn" disabled>编辑资料</button>
+        <button class="btn danger" type="button" id="del-btn" disabled>删除账号</button>
       </div>
     </div>
 
-    <!-- 用户详情：勾选恰好 1 个时出现（GET /users/{id}）-->
-    <div class="panel">
+    <!-- 用户详情：勾选恰好 1 个时出现（GET /users/{id}，这里直接用列表数据）-->
+    <div class="panel" id="detail-view" hidden>
       <h3>用户详情</h3>
       <div class="panel-body">
-        <div class="row"><span class="k">ID</span><span class="v">2</span></div>
-        <div class="row"><span class="k">邮箱</span><span class="v">bob@example.com</span></div>
-        <div class="row"><span class="k">名</span><span class="v">Bob</span></div>
-        <div class="row"><span class="k">姓</span><span class="v">Brown</span></div>
-        <div class="row"><span class="k">注册时间</span><span class="v">2026-08-22 14:03</span></div>
+        <div class="row"><span class="k">ID</span><span class="v" id="d-id"></span></div>
+        <div class="row"><span class="k">邮箱</span><span class="v" id="d-email"></span></div>
+        <div class="row"><span class="k">名</span><span class="v" id="d-first"></span></div>
+        <div class="row"><span class="k">姓</span><span class="v" id="d-last"></span></div>
+        <div class="row"><span class="k">注册时间</span><span class="v" id="d-created"></span></div>
       </div>
     </div>
 
-    <!-- 编辑表单：点"编辑资料"后出现（提交 = PUT /users/{id}）-->
-    <div class="edit-form">
-      <p class="ef-title">编辑 <b>Bob Brown</b></p>
+    <!-- 编辑表单：PR-14 会用 JS 控制显隐并接上 PUT /users/{id} -->
+    <div class="edit-form" id="edit-form" hidden>
+      <p class="ef-title">编辑 <b id="ef-name"></b></p>
       <div class="field">
         <label for="edit-email">邮箱（不可改）</label>
-        <input id="edit-email" type="email" value="bob@example.com" readonly>
+        <input id="edit-email" type="email" readonly>
       </div>
       <div class="field">
         <label for="edit-first">名 first_name</label>
-        <input id="edit-first" type="text" value="Bob">
+        <input id="edit-first" type="text">
       </div>
       <div class="field">
         <label for="edit-last">姓 last_name</label>
-        <input id="edit-last" type="text" value="Brown">
+        <input id="edit-last" type="text">
       </div>
       <div class="edit-actions">
-        <button class="btn" type="button">保存</button>
-        <button class="btn ghost" type="button">取消</button>
+        <button class="btn" type="button" id="save-edit">保存</button>
+        <button class="btn ghost" type="button" id="cancel-edit">取消</button>
       </div>
     </div>
 
-    <!-- 删除确认条：点"删除账号"后出现（确定 = 对每个选中的 DELETE /users/{id}）-->
-    <div class="confirm" hidden>
-      <span>确定要删除选中的 1 个账号吗？删除后无法恢复。</span>
+    <!-- 删除确认条：PR-14 会用 JS 控制显隐并接上 DELETE /users/{id} -->
+    <div class="confirm" id="del-confirm" hidden>
+      <span id="del-msg">确定要删除选中的账号吗？删除后无法恢复。</span>
       <div class="confirm-actions">
-        <button class="btn danger" type="button">确定删除</button>
-        <button class="btn ghost" type="button">取消</button>
+        <button class="btn danger" type="button" id="del-ok">确定删除</button>
+        <button class="btn ghost" type="button" id="del-cancel">取消</button>
       </div>
     </div>
 
-    <!-- ============ 这一屏对应哪些后端接口（学习用备注）============ -->
     <div class="note">
       <p>加载时读 <code>localStorage.currentUser</code>，没有就跳回 <code>login.html</code></p>
       <p>"我的资料"卡 &larr; <code>GET /users/{id}</code>；"所有用户"列表 &larr; <code>GET /users</code></p>
-      <p>勾选 1 个 &rarr; "用户详情"（<code>GET /users/{id}</code>）&rarr; 编辑资料 &rarr; <code>PUT /users/{id}</code></p>
-      <p>勾选 1 个或多个 &rarr; 删除账号 &rarr; 对每个选中的 <code>DELETE /users/{id}</code>（<code>204</code>）</p>
+      <p>勾选 1 个 &rarr; "用户详情"（<code>GET /users/{id}</code>）&rarr; 编辑资料 &rarr; <code>PUT /users/{id}</code>（PR-14）</p>
+      <p>勾选 1 个或多个 &rarr; 删除账号 &rarr; 对每个选中的 <code>DELETE /users/{id}</code>（PR-14）</p>
       <p>登出 &rarr; <code>localStorage.removeItem("currentUser")</code> &rarr; 跳登录页</p>
     </div>
   </main>
+
+  <script src="api.js"></script>
+  <script>
+    const me = getCurrentUser();
+
+    if (!me) {
+      // 没有登录状态 → 回登录页，下面的代码不再执行
+      location.href = "login.html";
+    } else {
+      // -------- 顶部问候 + 登出 --------
+      document.querySelector(".who").textContent = me.first_name;
+      document.getElementById("logout-btn").addEventListener("click", logout);
+
+      // -------- "我的资料"：GET /users/{id} --------
+      async function loadMyProfile() {
+        try {
+          const res = await fetch(`${API_BASE}/users/${me.id}`);
+          if (!res.ok) return;
+          const u = await res.json();
+          document.getElementById("me-id").textContent = u.id;
+          document.getElementById("me-email").textContent = u.email;
+          document.getElementById("me-first").textContent = u.first_name;
+          document.getElementById("me-last").textContent = u.last_name;
+          document.querySelector(".who").textContent = u.first_name;
+          // 顺手把 localStorage 里的也刷成最新
+          localStorage.setItem("currentUser", JSON.stringify(u));
+        } catch (err) {
+          console.error(err);
+        }
+      }
+
+      // -------- "所有用户"列表：GET /users --------
+      const listEl = document.getElementById("user-list");
+
+      async function loadUserList() {
+        const res = await fetch(`${API_BASE}/users`);
+        const users = await res.json();
+        listEl.innerHTML = "";
+        users.forEach((u) => {
+          const li = document.createElement("li");
+          // 把这一行的数据挂在 li 上，勾选时"用户详情"直接读它
+          li.dataset.id = u.id;
+          li.dataset.first = u.first_name;
+          li.dataset.last = u.last_name;
+          li.dataset.email = u.email;
+          li.dataset.created = (u.created_at || "").replace("T", " ").slice(0, 16);
+          li.innerHTML =
+            '<label class="pick-wrap">' +
+              '<input type="checkbox" class="pick">' +
+              '<span class="name">' + u.first_name + " " + u.last_name + "</span>" +
+              (u.id === me.id ? '<span class="mine">你</span>' : "") +
+            "</label>" +
+            '<span class="email">' + u.email + "</span>";
+          listEl.appendChild(li);
+        });
+        refreshSelection();
+      }
+
+      // -------- 勾选 → 用户详情 --------
+      const selbar = document.getElementById("selbar");
+      const selcount = document.getElementById("selcount");
+      const detailView = document.getElementById("detail-view");
+
+      function pickedRows() {
+        return Array.prototype.slice
+          .call(listEl.querySelectorAll("li"))
+          .filter((li) => {
+            const cb = li.querySelector(".pick");
+            return cb && cb.checked;
+          });
+      }
+
+      function refreshSelection() {
+        const rows = pickedRows();
+        const n = rows.length;
+        selbar.hidden = n === 0;
+        selcount.textContent = "已选 " + n + " 个";
+
+        if (n === 1) {
+          const li = rows[0];
+          document.getElementById("d-id").textContent = li.dataset.id;
+          document.getElementById("d-email").textContent = li.dataset.email;
+          document.getElementById("d-first").textContent = li.dataset.first;
+          document.getElementById("d-last").textContent = li.dataset.last;
+          document.getElementById("d-created").textContent = li.dataset.created || "—";
+          detailView.hidden = false;
+        } else {
+          detailView.hidden = true;
+        }
+      }
+
+      listEl.addEventListener("change", (e) => {
+        if (e.target.classList.contains("pick")) refreshSelection();
+      });
+
+      // -------- 启动：拉数据 --------
+      loadMyProfile();
+      loadUserList().catch((err) => {
+        console.error(err);
+        listEl.innerHTML =
+          "<li>连不上服务器。确认后端已启动、CORS 已放行本页面。</li>";
+      });
+    }
+  </script>
 </body>
 </html>
